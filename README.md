@@ -1,61 +1,157 @@
 # Allowance App
 
-Parent-funded virtual card app for kids. Dollar-denominated. Bitcoin invisible.
+A parent-funded virtual card app for kids. Parents fund allowance, kids spend via virtual card. Dollar-denominated, Bitcoin invisible.
 
-## The Idea
+## Current Status
 
-A mobile app where:
-- Parents fund allowance
-- Kids get a virtual card
-- Everything in dollars - no Bitcoin visible
+🚧 **MVP Development Phase**
 
-## Quick Start
+### Implemented Features
+- ✅ Login/Signup screen with authentication
+- ✅ Parent dashboard with child management
+- ✅ Child dashboard with balance display
+- ✅ Virtual card screen with freeze/unfreeze
+- ✅ Transaction history view
+- ✅ Settings screen
+- ✅ Mock API for development
 
-```bash
-# Install dependencies
-cd allowance-app
-npm install
+### TODO (MVP Scope)
+- [ ] Real backend API implementation
+- [ ] Database setup (PostgreSQL + Prisma)
+- [ ] Stripe integration for card issuing
+- [ ] Lightning integration (LND) for payments
+- [ ] Recurring allowance automation
+- [ ] Bank account linking
+- [ ] Push notifications
+- [ ] App store deployment
 
-# Run with Expo
-npm start
-```
+## Tech Stack
+
+### Frontend
+- **React Native** - Cross-platform mobile app (iOS/Android)
+- **TypeScript** - Type safety
+
+### Backend
+- **Node.js + Express** - REST API
+- **PostgreSQL** - User data, transactions
+- **Prisma** - Type-safe ORM
+- **Stripe** - Virtual card issuing
+- **LND** - Lightning Network payments
 
 ## Project Structure
 
 ```
-src/
-├── api/          # Mock API layer (replace with real backend)
-├── components/   # Reusable UI components
-├── screens/      # App screens
-├── types/        # TypeScript interfaces
-├── utils/        # Helper functions
-└── App.tsx       # Main app entry
+allowance-app/
+├── src/                  # Frontend (React Native)
+│   ├── screens/          # UI screens
+│   │   ├── LoginScreen.tsx
+│   │   ├── ParentDashboard.tsx
+│   │   ├── ChildDashboard.tsx
+│   │   ├── CardScreen.tsx
+│   │   ├── TransactionScreen.tsx
+│   │   └── SettingsScreen.tsx
+│   ├── api/              # API client (mock for now)
+│   ├── types/            # TypeScript types
+│   ├── utils/            # Utility functions
+│   └── App.tsx           # Main app entry point
+│
+└── backend/              # Backend API
+    └── src/
+        ├── index.ts      # Express app & routes
+        ├── services/     # Business logic
+        │   ├── database.ts
+        │   ├── lnd.ts
+        │   └── stripe.ts
+        └── middleware/   # Auth, etc.
 ```
 
-## Tech Stack
+## Getting Started
 
-- **Frontend:** React Native + Expo
-- **Backend:** Node.js (to be built)
-- **Payments:** Lightning (LND) - invisible to users
-- **Cards:** Stripe or similar
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- React Native development environment
+  - For iOS: Xcode, CocoaPods
+  - For Android: Android Studio, JDK
+
+### Installation
+
+1. **Clone the repo**
+   ```bash
+   cd ~/src/allowance-app
+   ```
+
+2. **Install dependencies**
+   ```bash
+   # Frontend
+   npm install
+
+   # iOS (Mac only)
+   cd ios && pod install && cd ..
+   ```
+
+3. **Run the app**
+   ```bash
+   # iOS
+   npm run ios
+
+   # Android
+   npm run android
+   ```
+
+### Backend Setup (Coming Soon)
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+## Development
+
+### Mock API
+Currently using mock API (`src/api/index.ts`) with fake data for rapid frontend development.
+
+**Demo credentials:** Any email/password will work in MVP mode.
+
+### Running Tests (TODO)
+```bash
+npm test
+```
+
+### Building for Production (TODO)
+```bash
+npm run build:ios
+npm run build:android
+```
+
+## MVP Scope
+
+See [SPEC.md](./SPEC.md) for full product specification.
+
+**Core MVP Features:**
+1. Parent creates account ✅
+2. Parent adds one child ✅ (UI done, needs backend)
+3. Parent funds account (simulated for now)
+4. Child sees balance ✅
+5. Virtual card display ✅
+
+## Revenue Model
+- $1.99/month per parent
+- Optional: Small fee on card transactions
 
 ## Key Principles
+- **No Bitcoin visible to users** - Always display in dollars
+- **Simple, boring, useful** - Not a "Bitcoin product"
+- **Recurring revenue** - Subscription-based
 
-1. **No Bitcoin visible** - always dollars
-2. **Simple, boring, useful** - not a Bitcoin product
-3. **Recurring revenue** - $1-99/month per parent
+## Contributing
 
-## MVP Features
+This is a private project. Contact the team for access.
 
-- [x] Parent signup/login
-- [x] Add child
-- [x] View balance (in dollars)
-- [x] Virtual card display
-- [x] Freeze/unfreeze card
-- [ ] Connect funding source
-- [ ] Set allowance schedule
-- [ ] Real card issuing
+## License
 
-## Status
+Proprietary - All rights reserved.
 
-Day 1 - Scaffolded. Core UI working with mock data.
+---
+
+**Last updated:** February 17, 2026
