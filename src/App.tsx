@@ -2,24 +2,28 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
 import api from './api';
-import { ChildDashboard, CardScreen, ParentDashboard } from './screens';
+import { LoginScreen, ChildDashboard, CardScreen, ParentDashboard } from './screens';
 import { Parent, Child } from './types';
 import { formatDollars } from './utils';
 
 // Screen types
-type Screen = 'parent' | 'child' | 'card';
+type Screen = 'login' | 'parent' | 'child' | 'card';
 
 const App: React.FC = () => {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('child');
+  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [parent, setParent] = useState<Parent | null>(null);
   const [child, setChild] = useState<Child | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [isAuthenticated]);
 
   const loadData = async () => {
+    setLoading(true);
     const [parentData, childData] = await Promise.all([
       api.getParent(),
       api.getChild(),
@@ -27,9 +31,25 @@ const App: React.FC = () => {
     setParent(parentData);
     setChild(childData);
     setLoading(false);
+    setCurrentScreen('child');
+  };
+
+  const handleLoginSuccess = (email: string) => {
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setParent(null);
+    setChild(null);
+    setCurrentScreen('login');
   };
 
   const renderScreen = () => {
+    if (!isAuthenticated) {
+      return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    }
+
     switch (currentScreen) {
       case 'card':
         return <CardScreen onBack={() => setCurrentScreen('child')} />;
@@ -58,50 +78,62 @@ const App: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.appName}>Allowance</Text>
-          {parent && (
-            <TouchableOpacity 
-              style={styles.switchButton}
-              onPress={() => setCurrentScreen(currentScreen === 'parent' ? 'child' : 'parent')}
-            >
-              <Text style={styles.switchButtonText}>
-                {currentScreen === 'parent' ? '👶 Kid View' : '👨 Parent View'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        {child && currentScreen === 'child' && (
-          <View style={styles.balanceBadge}>
-            <Text style={styles.balanceBadgeText}>{formatDollars(child.balance)}</Text>
+      {/* Header - only show when authenticated */}
+      {isAuthenticated && (
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.appName}>Allowance</Text>
+            {parent && (
+              <TouchableOpacity 
+                style={styles.switchButton}
+                onPress={() => setCurrentScreen(currentScreen === 'parent' ? 'child' : 'parent')}
+              >
+                <Text style={styles.switchButtonText}>
+                  {currentScreen === 'parent' ? '👶 Kid View' : '👨 Parent View'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
-        )}
-      </View>
+          <View style={styles.headerRight}>
+            {child && currentScreen === 'child' && (
+              <View style={styles.balanceBadge}>
+                <Text style={styles.balanceBadgeText}>{formatDollars(child.balance)}</Text>
+              </View>
+            )}
+            <TouchableOpacity 
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <Text style={styles.logoutButtonText}>↪</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Main Content */}
       <View style={styles.content}>
         {renderScreen()}
       </View>
 
-      {/* Tab Bar */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity 
-          style={[styles.tab, currentScreen === 'child' && styles.tabActive]}
-          onPress={() => setCurrentScreen('child')}
-        >
-          <Text style={[styles.tabText, currentScreen === 'child' && styles.tabTextActive]}>
-            {currentScreen === 'parent' ? 'Dashboard' : 'Home'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab}>
-          <Text style={styles.tabText}>Activity</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab}>
-          <Text style={styles.tabText}>Settings</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Tab Bar - only show when authenticated */}
+      {isAuthenticated && (
+        <View style={styles.tabBar}>
+          <TouchableOpacity 
+            style={[styles.tab, currentScreen === 'child' && styles.tabActive]}
+            onPress={() => setCurrentScreen('child')}
+          >
+            <Text style={[styles.tabText, currentScreen === 'child' && styles.tabTextActive]}>
+              {currentScreen === 'parent' ? 'Dashboard' : 'Home'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tab}>
+            <Text style={styles.tabText}>Activity</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tab}>
+            <Text style={styles.tabText}>Settings</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -133,6 +165,11 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   appName: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -155,6 +192,13 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  logoutButton: {
+    padding: 8,
+  },
+  logoutButtonText: {
+    fontSize: 20,
+    color: '#666',
   },
   content: {
     flex: 1,
