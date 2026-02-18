@@ -14,10 +14,11 @@ A parent-funded virtual card app for kids. Parents fund allowance, kids spend vi
 - ✅ Transaction history view
 - ✅ Settings screen
 - ✅ Mock API for development
+- ✅ Database setup (PostgreSQL + Prisma)
 
 ### TODO (MVP Scope)
+- [ ] JWT authentication middleware
 - [ ] Real backend API implementation
-- [ ] Database setup (PostgreSQL + Prisma)
 - [ ] Stripe integration for card issuing
 - [ ] Lightning integration (LND) for payments
 - [ ] Recurring allowance automation
