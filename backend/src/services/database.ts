@@ -1,150 +1,241 @@
-// Database Schema & Operations
-// Uses Prisma ORM for type safety
+import { PrismaClient } from '@prisma/client';
+import type { User, Child, Transaction, AllowancePlan } from '@prisma/client';
 
-// This would be a Prisma schema file
-/*
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(PARENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  children       Child[]
-  allowancePlans AllowancePlan[]
-}
-
-model Child {
-  id            String   @id @default(uuid())
-  parentId      String
-  name          String
-  balance       Int      @default(0) // in cents
-  stripeCardId  String?
-  cardLastFour String?
-  cardStatus   CardStatus @default(PENDING)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  parent     User      @relation(fields: [parentId], references: [id])
-  transactions Transaction[]
-  allowances AllowancePlan[]
-}
-
-model Transaction {
-  id          String      @id @default(uuid())
-  childId     String
-  amount      Int         // in cents (negative = spending, positive = deposit)
-  type        TransactionType
-  description String
-  stripeTxId  String?
-  createdAt   DateTime    @default(now())
-  
-  child Child @relation(fields: [childId], references: [id])
-}
-
-model AllowancePlan {
-  id          String          @id @default(uuid())
-  childId     String
-  amount      Int             // in cents
-  frequency   Frequency
-  nextPayout  DateTime
-  isActive    Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  
-  child Child @relation(fields: [childId], references: [id])
-}
-
-enum Role {
-  PARENT
-  CHILD
-}
-
-enum CardStatus {
-  PENDING
-  ACTIVE
-  FROZEN
-  CANCELLED
-}
-
-enum TransactionType {
-  DEPOSIT
-  WITHDRAWAL
-  ALLOWANCE
-  SPENDING
-  REFUND
-}
-
-enum Frequency {
-  WEEKLY
-  BIWEEKLY
-  MONTHLY
-}
-*/
-
-// Database service class
+/**
+ * Database Service
+ * 
+ * Wraps Prisma Client with typed operations for:
+ * - User management (parents & children)
+ * - Child accounts and cards
+ * - Transactions
+ * - Allowance plans
+ */
 export class Database {
-  private prisma: any;
+  private prisma: PrismaClient;
   
   constructor() {
-    // In production: this.prisma = new PrismaClient();
+    this.prisma = new PrismaClient({
+      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    });
   }
   
   // User operations
-  async users = {
-    create: async (data: any) => ({ id: 'user_' + Math.random().toString(36).substr(2, 9), ...data }),
-    findByEmail: async (email: string) => null,
-    findById: async (id: string) => null,
-    update: async (id: string, data: any) => ({ id, ...data }),
+  users = {
+    create: async (data: {
+      email: string;
+      passwordHash: string;
+      name: string;
+      role?: 'PARENT' | 'CHILD';
+    }): Promise<User> => {
+      return this.prisma.user.create({ data });
+    },
+    
+    findByEmail: async (email: string): Promise<User | null> => {
+      return this.prisma.user.findUnique({
+        where: { email },
+      });
+    },
+    
+    findById: async (id: string): Promise<User | null> => {
+      return this.prisma.user.findUnique({
+        where: { id },
+      });
+    },
+    
+    update: async (id: string, data: Partial<User>): Promise<User> => {
+      return this.prisma.user.update({
+        where: { id },
+        data,
+      });
+    },
   };
   
   // Child operations
-  async children = {
-    create: async (data: any) => ({ 
-      id: 'child_' + Math.random().toString(36).substr(2, 9), 
-      balance: 0,
-      cardStatus: 'PENDING',
-      ...data 
-    }),
-    findById: async (id: string) => null,
-    findByParentId: async (parentId: string) => [],
-    getBalance: async (childId: string) => 0,
-    getCard: async (childId: string) => null,
-    updateBalance: async (childId: string, amount: number) => {},
+  children = {
+    create: async (data: {
+      parentId: string;
+      name: string;
+      stripeCardId?: string;
+      cardLastFour?: string;
+    }): Promise<Child> => {
+      return this.prisma.child.create({ data });
+    },
+    
+    findById: async (id: string): Promise<Child | null> => {
+      return this.prisma.child.findUnique({
+        where: { id },
+        include: {
+          transactions: {
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+          },
+          allowances: {
+            where: { isActive: true },
+          },
+        },
+      });
+    },
+    
+    findByParentId: async (parentId: string): Promise<Child[]> => {
+      return this.prisma.child.findMany({
+        where: { parentId },
+        include: {
+          transactions: {
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          },
+          allowances: {
+            where: { isActive: true },
+          },
+        },
+      });
+    },
+    
+    getBalance: async (childId: string): Promise<number> => {
+      const child = await this.prisma.child.findUnique({
+        where: { id: childId },
+        select: { balance: true },
+      });
+      return child?.balance ?? 0;
+    },
+    
+    getCard: async (childId: string): Promise<{ stripeCardId: string; cardLastFour: string; cardStatus: string } | null> => {
+      const child = await this.prisma.child.findUnique({
+        where: { id: childId },
+        select: {
+          stripeCardId: true,
+          cardLastFour: true,
+          cardStatus: true,
+        },
+      });
+      
+      if (!child?.stripeCardId) return null;
+      
+      return {
+        stripeCardId: child.stripeCardId,
+        cardLastFour: child.cardLastFour!,
+        cardStatus: child.cardStatus,
+      };
+    },
+    
+    updateBalance: async (childId: string, amountCents: number): Promise<Child> => {
+      return this.prisma.child.update({
+        where: { id: childId },
+        data: {
+          balance: {
+            increment: amountCents,
+          },
+        },
+      });
+    },
+    
+    updateCardStatus: async (childId: string, status: 'PENDING' | 'ACTIVE' | 'FROZEN' | 'CANCELLED'): Promise<Child> => {
+      return this.prisma.child.update({
+        where: { id: childId },
+        data: { cardStatus: status },
+      });
+    },
   };
   
   // Transaction operations
-  async transactions = {
-    create: async (data: any) => ({ 
-      id: 'tx_' + Math.random().toString(36).substr(2, 9),
-      createdAt: new Date(),
-      ...data 
-    }),
-    list: async (options: { childId: string; limit: number; offset: number }) => [],
-    sumByType: async (childId: string, type: string) => 0,
+  transactions = {
+    create: async (data: {
+      childId: string;
+      amount: number;
+      type: 'DEPOSIT' | 'WITHDRAWAL' | 'ALLOWANCE' | 'SPENDING' | 'REFUND';
+      description: string;
+      stripeTxId?: string;
+    }): Promise<Transaction> => {
+      // Create transaction and update child balance atomically
+      return this.prisma.$transaction(async (tx) => {
+        const transaction = await tx.transaction.create({ data });
+        
+        await tx.child.update({
+          where: { id: data.childId },
+          data: {
+            balance: {
+              increment: data.amount,
+            },
+          },
+        });
+        
+        return transaction;
+      });
+    },
+    
+    list: async (options: {
+      childId: string;
+      limit?: number;
+      offset?: number;
+    }): Promise<Transaction[]> => {
+      return this.prisma.transaction.findMany({
+        where: { childId: options.childId },
+        orderBy: { createdAt: 'desc' },
+        take: options.limit ?? 20,
+        skip: options.offset ?? 0,
+      });
+    },
+    
+    sumByType: async (childId: string, type: string): Promise<number> => {
+      const result = await this.prisma.transaction.aggregate({
+        where: {
+          childId,
+          type: type as any,
+        },
+        _sum: {
+          amount: true,
+        },
+      });
+      return result._sum.amount ?? 0;
+    },
   };
   
   // Allowance operations
-  async allowance = {
-    create: async (data: any) => ({ 
-      id: 'allow_' + Math.random().toString(36).substr(2, 9),
-      isActive: true,
-      ...data 
-    }),
-    findPending: async () => [],
-    update: async (id: string, data: any) => ({ id, ...data }),
+  allowance = {
+    create: async (data: {
+      parentId: string;
+      childId: string;
+      amount: number;
+      frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+      nextPayout: Date;
+    }): Promise<AllowancePlan> => {
+      return this.prisma.allowancePlan.create({ data });
+    },
+    
+    getPending: async (): Promise<AllowancePlan[]> => {
+      return this.prisma.allowancePlan.findMany({
+        where: {
+          isActive: true,
+          nextPayout: {
+            lte: new Date(),
+          },
+        },
+        include: {
+          child: true,
+          parent: true,
+        },
+      });
+    },
+    
+    update: async (id: string, data: Partial<AllowancePlan>): Promise<AllowancePlan> => {
+      return this.prisma.allowancePlan.update({
+        where: { id },
+        data,
+      });
+    },
+    
+    deactivate: async (id: string): Promise<AllowancePlan> => {
+      return this.prisma.allowancePlan.update({
+        where: { id },
+        data: { isActive: false },
+      });
+    },
   };
+  
+  // Cleanup
+  async disconnect() {
+    await this.prisma.$disconnect();
+  }
 }
 
 export default Database;

@@ -1,0 +1,105 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(PARENT)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  children       Child[]
+  allowancePlans AllowancePlan[]
+  
+  @@map("users")
+}
+
+model Child {
+  id           String     @id @default(uuid())
+  parentId     String
+  name         String
+  balance      Int        @default(0) // in cents
+  stripeCardId String?
+  cardLastFour String?
+  cardStatus   CardStatus @default(PENDING)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  
+  parent       User            @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  allowances   AllowancePlan[]
+  
+  @@index([parentId])
+  @@map("children")
+}
+
+model Transaction {
+  id          String          @id @default(uuid())
+  childId     String
+  amount      Int             // in cents (negative = spending, positive = deposit)
+  type        TransactionType
+  description String
+  stripeTxId  String?
+  createdAt   DateTime        @default(now())
+  
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+  
+  @@index([childId, createdAt])
+  @@map("transactions")
+}
+
+model AllowancePlan {
+  id         String    @id @default(uuid())
+  parentId   String
+  childId    String
+  amount     Int       // in cents
+  frequency  Frequency
+  nextPayout DateTime
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  
+  parent User  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  child  Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+  
+  @@index([childId, isActive])
+  @@index([nextPayout, isActive])
+  @@map("allowance_plans")
+}
+
+enum Role {
+  PARENT
+  CHILD
+}
+
+enum CardStatus {
+  PENDING
+  ACTIVE
+  FROZEN
+  CANCELLED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  ALLOWANCE
+  SPENDING
+  REFUND
+}
+
+enum Frequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
